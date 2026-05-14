@@ -88,6 +88,19 @@ body{background:#020818;background-image:radial-gradient(ellipse 80% 60% at 20% 
 .ml-line{flex:1;height:1px;background:linear-gradient(90deg,rgba(196,181,253,0.25),transparent);}
 .ml-tag{font-size:10px;color:var(--text-dim);font-family:var(--mono);white-space:nowrap;}
 .footer{border-top:1px solid var(--glass-border);padding:20px 48px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-dim);font-family:var(--mono);margin-top:20px;background:rgba(10,15,35,0.6);backdrop-filter:blur(20px);}
+.login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(1,8,27,0.92);backdrop-filter:blur(10px);z-index:9999;padding:24px;}
+.login-panel{width:min(520px,100%);padding:32px;border-radius:28px;background:rgba(10,15,35,0.96);border:1px solid rgba(255,255,255,0.14);box-shadow:0 32px 80px rgba(0,0,0,0.45);}
+.login-title{font-size:28px;line-height:1.05;margin:8px 0 6px;}
+.login-desc{font-size:13px;color:var(--text-muted);max-width:460px;}
+.login-field{margin-top:18px;}
+.login-field label{display:block;margin-bottom:10px;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;}
+.login-field input{width:100%;min-height:48px;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);color:var(--text);font-size:14px;}
+.login-field input:focus{outline:none;border-color:rgba(96,165,250,0.8);box-shadow:0 0 0 4px rgba(96,165,250,0.12);}
+.login-button{width:100%;margin-top:24px;min-height:52px;border:none;border-radius:16px;background:linear-gradient(90deg,#60a5fa,#3ecf8e);color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:transform 0.2s ease,filter 0.2s ease;}
+.login-button:hover{filter:brightness(1.05);transform:translateY(-1px);}
+.login-note{margin-top:16px;font-size:12px;color:var(--text-dim);text-align:center;}
+.login-error{margin-top:14px;min-height:20px;color:#fda4af;font-size:12px;opacity:0;transition:opacity .2s ease;}
+body.login-active header, body.login-active main, body.login-active footer, body.login-active #tt-overlay{filter:blur(3px);pointer-events:none;user-select:none;opacity:0.35;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 .metric-card{animation:fadeUp 0.45s ease both;}
 .metric-card:nth-child(1){animation-delay:.05s}.metric-card:nth-child(2){animation-delay:.1s}.metric-card:nth-child(3){animation-delay:.15s}.metric-card:nth-child(4){animation-delay:.2s}.metric-card:nth-child(5){animation-delay:.25s}
@@ -129,7 +142,30 @@ body{background:#020818;background-image:radial-gradient(ellipse 80% 60% at 20% 
 .hoverable-bar{cursor:pointer;}
 </style>
 </head>
-<body>
+<body class="login-active">
+
+<div id="login-screen" class="login-screen">
+  <div class="login-panel glass">
+    <div style="margin-bottom:24px;">
+      <div class="brand">Tangoe · Customer Success Intelligence</div>
+      <h2 class="login-title">Welcome back</h2>
+      <p class="login-desc">Sign in to continue to the Customer Risk Migration Dashboard.</p>
+    </div>
+    <form id="login-form">
+      <div class="login-field">
+        <label for="login-user">Username</label>
+        <input id="login-user" type="text" placeholder="Enter username" autocomplete="username" />
+      </div>
+      <div class="login-field">
+        <label for="login-pass">Password</label>
+        <input id="login-pass" type="password" placeholder="Enter password" autocomplete="current-password" />
+      </div>
+      <div id="login-error" class="login-error" aria-live="polite"></div>
+      <button class="login-button" type="submit">Sign in</button>
+      <p class="login-note">No backend validation is required. Use any values to continue.</p>
+    </form>
+  </div>
+</div>
 
 <!-- ── TOOLTIP OVERLAY ── -->
 <div id="tt-overlay">
@@ -683,6 +719,41 @@ new Chart(document.getElementById('silhouetteChart'),{type:'line',data:{labels:[
 
 /* 17. Factor-risk corr */
 new Chart(document.getElementById('factorRiskCorrChart'),{type:'bar',data:{labels:['Factor 3','Factor 1','Factor 5','Factor 2','Factor 4'],datasets:[{data:[0.502,0.263,0.254,0.181,0.057],backgroundColor:['rgba(196,181,253,0.8)','rgba(148,163,184,0.6)','rgba(148,163,184,0.6)','rgba(148,163,184,0.6)','rgba(148,163,184,0.35)'],borderColor:['#c4b5fd','#94a3b8','#94a3b8','#94a3b8','#64748b'],borderWidth:1,borderRadius:4,borderSkipped:false}]},options:{...base,scales:{x:{ticks:{color:tC,font:{size:11,family:'JetBrains Mono'}},grid:{display:false},border:{display:false}},y:{ticks:{color:tC,font:{size:11,family:'JetBrains Mono'},callback:v=>v.toFixed(2)},grid:{color:gC},border:{display:false},min:0,max:0.6}},plugins:{...base.plugins,tooltip:{callbacks:{label:ctx=>` Corr with risk: ${ctx.parsed.y.toFixed(3)}`}}}}});
+
+const loginScreen = document.getElementById('login-screen');
+const loginForm = document.getElementById('login-form');
+const loginUser = document.getElementById('login-user');
+const loginPass = document.getElementById('login-pass');
+const loginError = document.getElementById('login-error');
+
+function unlockDashboard() {
+  document.body.classList.remove('login-active');
+  loginError.textContent = '';
+  loginError.style.opacity = '0';
+  loginScreen.style.display = 'none';
+}
+
+loginForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const user = loginUser.value.trim();
+  const pass = loginPass.value.trim();
+
+  if (!user || !pass) {
+    loginError.textContent = 'Please enter both username and password.';
+    loginError.style.opacity = '1';
+    return;
+  }
+
+  unlockDashboard();
+});
+
+[loginUser, loginPass].forEach(el => el.addEventListener('input', () => {
+  if (loginError.style.opacity === '1') {
+    loginError.style.opacity = '0';
+  }
+}));
+
+loginUser.focus();
 </script>
 </body>
 </html>
