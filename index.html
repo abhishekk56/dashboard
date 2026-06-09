@@ -99,6 +99,16 @@ body{background:#020818;background-image:radial-gradient(ellipse 80% 60% at 20% 
 .login-button{width:100%;margin-top:24px;min-height:52px;border:none;border-radius:16px;background:linear-gradient(90deg,#60a5fa,#3ecf8e);color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:transform 0.2s ease,filter 0.2s ease;}
 .login-button:hover{filter:brightness(1.05);transform:translateY(-1px);}
 .login-note{margin-top:16px;font-size:12px;color:var(--text-dim);text-align:center;}
+.smartsheet-panel{padding:26px 28px 24px;margin-bottom:26px;}
+.smartsheet-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+.smartsheet-desc{margin-top:6px;color:var(--text-muted);font-size:12px;max-width:680px;line-height:1.6;}
+.smartsheet-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:end;}
+.smartsheet-field{display:flex;flex-direction:column;gap:8px;}
+.smartsheet-field label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-family:var(--mono);}
+.smartsheet-field input{width:100%;min-height:48px;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);color:var(--text);font-size:14px;}
+.smartsheet-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.smartsheet-status{font-size:12px;color:var(--text-dim);}
+.login-note{margin-top:16px;font-size:12px;color:var(--text-dim);text-align:center;}
 .login-error{margin-top:14px;min-height:20px;color:#fda4af;font-size:12px;opacity:0;transition:opacity .2s ease;}
 body.login-active header, body.login-active main, body.login-active footer, body.login-active #tt-overlay{filter:blur(3px);pointer-events:none;user-select:none;opacity:0.35;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -203,6 +213,32 @@ body.login-active header, body.login-active main, body.login-active footer, body
     <p class="date-label">Report generated · April 2026</p>
   </div>
 </header>
+
+<div class="container">
+  <section class="smartsheet-panel glass">
+    <div class="smartsheet-header">
+      <div>
+        <p class="section-label">Smartsheet Live Data</p>
+        <p class="smartsheet-desc">Enter the Customer Success Master sheet name or ID plus an API token to load live data. Data is fetched locally in your browser only.</p>
+      </div>
+    </div>
+    <div class="smartsheet-fields">
+      <div class="smartsheet-field">
+        <label for="smartsheet-sheet-id">Sheet name or ID</label>
+        <input id="smartsheet-sheet-id" type="text" placeholder="Customer Success Master or sheet ID" value="Customer Success Master" />
+      </div>
+      <div class="smartsheet-field">
+        <label for="smartsheet-token">API Access Token</label>
+        <input id="smartsheet-token" type="password" placeholder="Smartsheet API token" />
+      </div>
+      <div class="smartsheet-actions">
+        <button id="smartsheet-load" class="login-button" type="button">Load Smartsheet data</button>
+        <span id="smartsheet-status" class="smartsheet-status">No live data loaded.</span>
+      </div>
+      <div id="smartsheet-error" class="login-error" aria-live="polite"></div>
+    </div>
+  </section>
+</div>
 
 <main class="container">
 
@@ -719,6 +755,254 @@ new Chart(document.getElementById('silhouetteChart'),{type:'line',data:{labels:[
 
 /* 17. Factor-risk corr */
 new Chart(document.getElementById('factorRiskCorrChart'),{type:'bar',data:{labels:['Factor 3','Factor 1','Factor 5','Factor 2','Factor 4'],datasets:[{data:[0.502,0.263,0.254,0.181,0.057],backgroundColor:['rgba(196,181,253,0.8)','rgba(148,163,184,0.6)','rgba(148,163,184,0.6)','rgba(148,163,184,0.6)','rgba(148,163,184,0.35)'],borderColor:['#c4b5fd','#94a3b8','#94a3b8','#94a3b8','#64748b'],borderWidth:1,borderRadius:4,borderSkipped:false}]},options:{...base,scales:{x:{ticks:{color:tC,font:{size:11,family:'JetBrains Mono'}},grid:{display:false},border:{display:false}},y:{ticks:{color:tC,font:{size:11,family:'JetBrains Mono'},callback:v=>v.toFixed(2)},grid:{color:gC},border:{display:false},min:0,max:0.6}},plugins:{...base.plugins,tooltip:{callbacks:{label:ctx=>` Corr with risk: ${ctx.parsed.y.toFixed(3)}`}}}}});
+
+const ssSheetIdInput = document.getElementById('smartsheet-sheet-id');
+const ssTokenInput = document.getElementById('smartsheet-token');
+const ssLoadButton = document.getElementById('smartsheet-load');
+const ssStatusText = document.getElementById('smartsheet-status');
+const ssErrorText = document.getElementById('smartsheet-error');
+const SMARTSHEET_CONFIG_KEY = 'smartsheetDashboardConfig';
+const SMARTSHEET_BASE = 'https://api.smartsheet.com/2.0';
+
+function setSmartsheetStatus(message, isError = false) {
+  ssStatusText.textContent = message;
+  ssErrorText.textContent = isError ? message : '';
+  ssErrorText.style.opacity = isError ? '1' : '0';
+}
+
+function saveSmartsheetConfig() {
+  localStorage.setItem(SMARTSHEET_CONFIG_KEY, JSON.stringify({
+    sheetId: ssSheetIdInput.value.trim(),
+    token: ssTokenInput.value.trim()
+  }));
+}
+
+function loadSmartsheetConfig() {
+  const raw = localStorage.getItem(SMARTSHEET_CONFIG_KEY);
+  if (!raw) return;
+  try {
+    const config = JSON.parse(raw);
+    ssSheetIdInput.value = config.sheetId || 'Customer Success Master';
+    ssTokenInput.value = config.token || '';
+  } catch (e) {
+    console.warn('Unable to parse Smartsheet config.', e);
+  }
+}
+
+async function findSmartsheetIdByName(sheetName, token) {
+  const url = `${SMARTSHEET_BASE}/sheets`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`${response.status} ${response.statusText} - ${body}`);
+  }
+  const data = await response.json();
+  const sheets = data.data || data.sheets || [];
+  const match = sheets.find(sheet => sheet.name?.toLowerCase() === sheetName.toLowerCase());
+  return match?.id || null;
+}
+
+async function fetchSmartsheetSheet(sheetRef, token) {
+  let sheetId = sheetRef;
+  if (!/^[0-9]+$/.test(sheetRef)) {
+    sheetId = await findSmartsheetIdByName(sheetRef, token);
+    if (!sheetId) {
+      throw new Error(`Sheet named "${sheetRef}" not found. Verify the name or enter the sheet ID.`);
+    }
+  }
+  const url = `${SMARTSHEET_BASE}/sheets/${sheetId}?include=columns,rows`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`${response.status} ${response.statusText} - ${body}`);
+  }
+  return response.json();
+}
+
+function normalizeHeader(title) {
+  return title.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function findColumnMap(columns) {
+  return columns.reduce((map, column) => {
+    map[normalizeHeader(column.title)] = column.id;
+    return map;
+  }, {});
+}
+
+function findColumnId(columnMap, names) {
+  const normalized = names.map(normalizeHeader);
+  return Object.entries(columnMap).find(([key]) => normalized.includes(key))?.[1] || null;
+}
+
+function getCellValue(row, columnId) {
+  if (!columnId) return '';
+  const cell = row.cells.find(c => c.columnId === columnId);
+  return cell ? (cell.displayValue ?? cell.value ?? '') : '';
+}
+
+function normalizeRiskStatus(value) {
+  if (!value) return '';
+  const raw = value.toString().toLowerCase();
+  if (raw.includes('green')) return 'Green';
+  if (raw.includes('yellow')) return 'Yellow';
+  if (raw.includes('red')) return 'Red';
+  if (raw.includes('blue')) return 'Blue';
+  if (raw.includes('black') || raw.includes('terminated') || raw.includes('churn')) return 'Black';
+  return value.toString();
+}
+
+function parseMoney(value) {
+  if (value === null || value === undefined) return 0;
+  const cleaned = value.toString().replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseNumber(value) {
+  if (value === null || value === undefined) return null;
+  const cleaned = value.toString().replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildDashboardRows(sheet) {
+  const columnMap = findColumnMap(sheet.columns);
+  const mappings = {
+    name: ['customer','company','customername','name'],
+    code: ['code','id','customercode','account','accountid'],
+    status: ['status','riskstatus','currentstatus'],
+    prevStatus: ['prevstatus','previousstatus','priorstatus'],
+    arr: ['arr','arrvalue','annualrecurringrevenue','revenue','amount'],
+    renewal: ['renewaldate','renewal'],
+    daysInRisk: ['daysinrisk','daysrisk','riskdays']
+  };
+
+  const ids = Object.fromEntries(Object.entries(mappings).map(([key, names]) => [key, findColumnId(columnMap, names)]));
+  return sheet.rows.map(row => ({
+    code: getCellValue(row, ids.code) || `ROW-${row.id}`,
+    name: getCellValue(row, ids.name) || `Customer ${row.id}`,
+    status: normalizeRiskStatus(getCellValue(row, ids.status)),
+    prevStatus: normalizeRiskStatus(getCellValue(row, ids.prevStatus)),
+    arr: parseMoney(getCellValue(row, ids.arr)),
+    renewal: getCellValue(row, ids.renewal),
+    daysInRisk: parseNumber(getCellValue(row, ids.daysInRisk))
+  }));
+}
+
+function computeSmartsheetMetrics(rows) {
+  const riskLevels = ['Green','Black','Yellow','Blue','Red'];
+  const counts = Object.fromEntries(riskLevels.map(level => [level, 0]));
+  const arrSums = Object.fromEntries(riskLevels.map(level => [level, 0]));
+  let atRiskCustomers = 0;
+  let atRiskArr = 0;
+  let totalDays = 0;
+  let daysCount = 0;
+  let riskMovingUp = 0;
+
+  rows.forEach(row => {
+    const status = row.status;
+    if (riskLevels.includes(status)) {
+      counts[status] += 1;
+      arrSums[status] += row.arr;
+    }
+    if (status === 'Yellow' || status === 'Red') {
+      atRiskCustomers += 1;
+      atRiskArr += row.arr;
+    }
+    if (row.daysInRisk !== null) {
+      totalDays += row.daysInRisk;
+      daysCount += 1;
+    }
+    if (row.prevStatus && row.status) {
+      const order = {Green: 1, Blue: 2, Yellow: 3, Red: 4, Black: 5};
+      if ((order[row.prevStatus] || 0) < (order[row.status] || 0)) {
+        riskMovingUp += 1;
+      }
+    }
+  });
+
+  return {
+    counts,
+    arrSums,
+    totalCustomers: rows.length,
+    atRiskCustomers,
+    atRiskArr,
+    riskMovingUp,
+    avgDaysInRisk: daysCount ? Math.round(totalDays / daysCount) : null
+  };
+}
+
+function updateMetricCard(segment, value, suffix = '') {
+  const card = document.querySelector(`.metric-card[data-segment="${segment}"] .metric-value`);
+  if (card) card.textContent = `${value}${suffix}`;
+}
+
+function applySmartsheetData(metrics) {
+  updateMetricCard('all', metrics.totalCustomers);
+  updateMetricCard('at-risk', metrics.atRiskCustomers);
+  updateMetricCard('worsening', metrics.riskMovingUp);
+  updateMetricCard('arr-at-risk', `$${(metrics.atRiskArr / 1000000).toFixed(1)}M`);
+  if (metrics.avgDaysInRisk !== null) {
+    updateMetricCard('all-active', metrics.avgDaysInRisk);
+  }
+
+  if (typeof riskDistChart !== 'undefined') {
+    riskDistChart.data.datasets[0].data = [
+      metrics.counts.Green,
+      metrics.counts.Black,
+      metrics.counts.Yellow,
+      metrics.counts.Blue,
+      metrics.counts.Red
+    ];
+    riskDistChart.update();
+  }
+
+  if (typeof arrChart !== 'undefined') {
+    arrChart.data.datasets[0].data = [
+      metrics.arrSums.Green / 1000000,
+      metrics.arrSums.Yellow / 1000000,
+      metrics.arrSums.Blue / 1000000,
+      metrics.arrSums.Red / 1000000
+    ];
+    arrChart.update();
+  }
+}
+
+async function loadLiveSmartsheetData() {
+  const sheetId = ssSheetIdInput.value.trim();
+  const token = ssTokenInput.value.trim();
+  if (!sheetId || !token) {
+    setSmartsheetStatus('Both sheet ID and token are required.', true);
+    return;
+  }
+
+  setSmartsheetStatus('Loading live data from Smartsheet...', false);
+  ssErrorText.style.opacity = '0';
+
+  try {
+    saveSmartsheetConfig();
+    const sheet = await fetchSmartsheetSheet(sheetId, token);
+    const rows = buildDashboardRows(sheet);
+    const metrics = computeSmartsheetMetrics(rows);
+    applySmartsheetData(metrics);
+    setSmartsheetStatus(`Live data loaded from Smartsheet — ${metrics.totalCustomers} rows processed.`);
+  } catch (error) {
+    console.error(error);
+    setSmartsheetStatus('Could not load Smartsheet data. Check your sheet ID, token, and network.', true);
+  }
+}
+
+ssLoadButton.addEventListener('click', loadLiveSmartsheetData);
+[ssSheetIdInput, ssTokenInput].forEach(input => input.addEventListener('input', () => setSmartsheetStatus('Ready to load live data.')));
+loadSmartsheetConfig();
+if (ssSheetIdInput.value && ssTokenInput.value) {
+  loadLiveSmartsheetData();
+}
 
 const loginScreen = document.getElementById('login-screen');
 const loginForm = document.getElementById('login-form');
