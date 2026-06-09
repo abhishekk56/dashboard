@@ -33,6 +33,12 @@ async function smartsheetFetch(url, token) {
   return response.json();
 }
 
+function parseSheetRef(ref) {
+  if (!ref) return '';
+  const urlMatch = ref.match(/\/sheets\/([A-Za-z0-9_-]+)/i);
+  return urlMatch ? urlMatch[1] : ref;
+}
+
 app.get('/api/smartsheet', async (req, res) => {
   try {
     const sheetRef = (req.query.sheetRef || '').trim();
@@ -45,21 +51,27 @@ app.get('/api/smartsheet', async (req, res) => {
       return res.status(400).json(buildError(400, 'Missing Smartsheet API token. Set SMARTSHEET_API_TOKEN or pass token query parameter.'));
     }
 
-    let sheetId = sheetRef;
-    if (!/^[0-9]+$/.test(sheetRef)) {
-      const listUrl = `${SMARTSHEET_BASE}/sheets`;
-      const listData = await smartsheetFetch(listUrl, token);
-      const sheets = listData.data || listData.sheets || [];
-      const match = sheets.find(sheet => sheet.name?.toLowerCase() === sheetRef.toLowerCase());
-      if (!match) {
-        return res.status(404).json(buildError(404, `Sheet named "${sheetRef}" not found. Use a sheet ID or verify the sheet name.`));
-      }
-      sheetId = match.id;
-    }
+    const parsedRef = parseSheetRef(sheetRef);
+    const sheetUrl = `${SMARTSHEET_BASE}/sheets/${parsedRef}?include=columns,rows`;
 
-    const sheetUrl = `${SMARTSHEET_BASE}/sheets/${sheetId}?include=columns,rows`;
-    const sheetData = await smartsheetFetch(sheetUrl, token);
-    return res.json(sheetData);
+    try {
+      const sheetData = await smartsheetFetch(sheetUrl, token);
+      return res.json(sheetData);
+    } catch (error) {
+      if (error.status === 404) {
+        const listUrl = `${SMARTSHEET_BASE}/sheets`;
+        const listData = await smartsheetFetch(listUrl, token);
+        const sheets = listData.data || listData.sheets || [];
+        const match = sheets.find(sheet => sheet.name?.toLowerCase() === sheetRef.toLowerCase());
+        if (!match) {
+          return res.status(404).json(buildError(404, `Sheet named "${sheetRef}" not found. Use a sheet URL, sheet ID, or verify the sheet name.`));
+        }
+        const fallbackUrl = `${SMARTSHEET_BASE}/sheets/${match.id}?include=columns,rows`;
+        const sheetData = await smartsheetFetch(fallbackUrl, token);
+        return res.json(sheetData);
+      }
+      throw error;
+    }
   } catch (error) {
     console.error(error);
     const status = error.status || 500;
