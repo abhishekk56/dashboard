@@ -231,7 +231,7 @@ body.login-active header, body.login-active main, body.login-active footer, body
     <div class="smartsheet-header">
       <div>
         <p class="section-label">Smartsheet Live Data</p>
-        <p class="smartsheet-desc">Enter the Customer Success Master sheet name or ID. Token is optional if the server is configured with a Smartsheet API token.</p>
+        <p class="smartsheet-desc">Enter the Customer Success Master sheet ID or full Smartsheet sheet URL, plus your API token. The page fetches data directly from Smartsheet in the browser.</p>
       </div>
     </div>
     <div class="smartsheet-fields">
@@ -784,6 +784,7 @@ const ssLoadButton = document.getElementById('smartsheet-load');
 const ssStatusText = document.getElementById('smartsheet-status');
 const ssErrorText = document.getElementById('smartsheet-error');
 const SMARTSHEET_CONFIG_KEY = 'smartsheetDashboardConfig';
+const SMARTSHEET_BASE = 'https://api.smartsheet.com/2.0';
 
 function setSmartsheetStatus(message, isError = false) {
   ssStatusText.textContent = message;
@@ -810,13 +811,23 @@ function loadSmartsheetConfig() {
   }
 }
 
+function normalizeSheetRef(value) {
+  if (!value) return '';
+  const trimmed = value.trim();
+  const urlMatch = trimmed.match(/\/sheets\/([A-Za-z0-9_-]+)/i);
+  return urlMatch ? urlMatch[1] : trimmed;
+}
+
 async function fetchSmartsheetSheet(sheetRef, token) {
-  const params = new URLSearchParams({ sheetRef });
-  if (token) params.set('token', token);
-  const response = await fetch(`/api/smartsheet?${params.toString()}`);
+  const response = await fetch(`${SMARTSHEET_BASE}/sheets/${sheetRef}?include=columns,rows`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json'
+    }
+  });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.message || `Server error ${response.status}`);
+    throw new Error(body.message || `Smartsheet API error ${response.status}`);
   }
   return response.json();
 }
@@ -972,10 +983,15 @@ function applySmartsheetData(metrics) {
 }
 
 async function loadLiveSmartsheetData() {
-  const sheetRef = ssSheetIdInput.value.trim();
+  const rawSheetRef = ssSheetIdInput.value.trim();
+  const sheetRef = normalizeSheetRef(rawSheetRef);
   const token = ssTokenInput.value.trim();
   if (!sheetRef) {
-    setSmartsheetStatus('Sheet name or ID is required.', true);
+    setSmartsheetStatus('Sheet URL or ID is required.', true);
+    return;
+  }
+  if (!token) {
+    setSmartsheetStatus('Smartsheet API token is required.', true);
     return;
   }
 
@@ -991,7 +1007,7 @@ async function loadLiveSmartsheetData() {
     setSmartsheetStatus(`Live data loaded from Smartsheet — ${metrics.totalCustomers} rows processed.`);
   } catch (error) {
     console.error(error);
-    setSmartsheetStatus(error.message || 'Could not load Smartsheet data. Check your sheet name/ID, token, and network.', true);
+    setSmartsheetStatus(error.message || 'Could not load Smartsheet data. Check your sheet name/ID/URL, token, and network.', true);
   }
 }
 
