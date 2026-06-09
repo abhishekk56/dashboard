@@ -219,7 +219,7 @@ body.login-active header, body.login-active main, body.login-active footer, body
     <div class="smartsheet-header">
       <div>
         <p class="section-label">Smartsheet Live Data</p>
-        <p class="smartsheet-desc">Enter the Customer Success Master sheet name or ID plus an API token to load live data. Data is fetched locally in your browser only.</p>
+        <p class="smartsheet-desc">Enter the Customer Success Master sheet name or ID. Token is optional if the server is configured with a Smartsheet API token.</p>
       </div>
     </div>
     <div class="smartsheet-fields">
@@ -228,8 +228,8 @@ body.login-active header, body.login-active main, body.login-active footer, body
         <input id="smartsheet-sheet-id" type="text" placeholder="Customer Success Master or sheet ID" value="Customer Success Master" />
       </div>
       <div class="smartsheet-field">
-        <label for="smartsheet-token">API Access Token</label>
-        <input id="smartsheet-token" type="password" placeholder="Smartsheet API token" />
+        <label for="smartsheet-token">API Access Token (optional)</label>
+        <input id="smartsheet-token" type="password" placeholder="Smartsheet API token (optional)" />
       </div>
       <div class="smartsheet-actions">
         <button id="smartsheet-load" class="login-button" type="button">Load Smartsheet data</button>
@@ -762,7 +762,6 @@ const ssLoadButton = document.getElementById('smartsheet-load');
 const ssStatusText = document.getElementById('smartsheet-status');
 const ssErrorText = document.getElementById('smartsheet-error');
 const SMARTSHEET_CONFIG_KEY = 'smartsheetDashboardConfig';
-const SMARTSHEET_BASE = 'https://api.smartsheet.com/2.0';
 
 function setSmartsheetStatus(message, isError = false) {
   ssStatusText.textContent = message;
@@ -789,36 +788,13 @@ function loadSmartsheetConfig() {
   }
 }
 
-async function findSmartsheetIdByName(sheetName, token) {
-  const url = `${SMARTSHEET_BASE}/sheets`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`${response.status} ${response.statusText} - ${body}`);
-  }
-  const data = await response.json();
-  const sheets = data.data || data.sheets || [];
-  const match = sheets.find(sheet => sheet.name?.toLowerCase() === sheetName.toLowerCase());
-  return match?.id || null;
-}
-
 async function fetchSmartsheetSheet(sheetRef, token) {
-  let sheetId = sheetRef;
-  if (!/^[0-9]+$/.test(sheetRef)) {
-    sheetId = await findSmartsheetIdByName(sheetRef, token);
-    if (!sheetId) {
-      throw new Error(`Sheet named "${sheetRef}" not found. Verify the name or enter the sheet ID.`);
-    }
-  }
-  const url = `${SMARTSHEET_BASE}/sheets/${sheetId}?include=columns,rows`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  const params = new URLSearchParams({ sheetRef });
+  if (token) params.set('token', token);
+  const response = await fetch(`/api/smartsheet?${params.toString()}`);
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`${response.status} ${response.statusText} - ${body}`);
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || `Server error ${response.status}`);
   }
   return response.json();
 }
@@ -974,10 +950,10 @@ function applySmartsheetData(metrics) {
 }
 
 async function loadLiveSmartsheetData() {
-  const sheetId = ssSheetIdInput.value.trim();
+  const sheetRef = ssSheetIdInput.value.trim();
   const token = ssTokenInput.value.trim();
-  if (!sheetId || !token) {
-    setSmartsheetStatus('Both sheet ID and token are required.', true);
+  if (!sheetRef) {
+    setSmartsheetStatus('Sheet name or ID is required.', true);
     return;
   }
 
@@ -986,21 +962,21 @@ async function loadLiveSmartsheetData() {
 
   try {
     saveSmartsheetConfig();
-    const sheet = await fetchSmartsheetSheet(sheetId, token);
+    const sheet = await fetchSmartsheetSheet(sheetRef, token);
     const rows = buildDashboardRows(sheet);
     const metrics = computeSmartsheetMetrics(rows);
     applySmartsheetData(metrics);
     setSmartsheetStatus(`Live data loaded from Smartsheet — ${metrics.totalCustomers} rows processed.`);
   } catch (error) {
     console.error(error);
-    setSmartsheetStatus('Could not load Smartsheet data. Check your sheet ID, token, and network.', true);
+    setSmartsheetStatus(error.message || 'Could not load Smartsheet data. Check your sheet name/ID, token, and network.', true);
   }
 }
 
 ssLoadButton.addEventListener('click', loadLiveSmartsheetData);
 [ssSheetIdInput, ssTokenInput].forEach(input => input.addEventListener('input', () => setSmartsheetStatus('Ready to load live data.')));
 loadSmartsheetConfig();
-if (ssSheetIdInput.value && ssTokenInput.value) {
+if (ssSheetIdInput.value) {
   loadLiveSmartsheetData();
 }
 
