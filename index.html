@@ -224,22 +224,20 @@ body.login-active header, body.login-active main, body.login-active footer, body
 <div class="tabbar">
   <button class="tab-button active" data-target="tab-original">Risk Migration Dashboard</button>
   <button class="tab-button" data-target="tab-new">Migration Drivers Dashboard</button>
-</div>
-
-<div id="tab-original" class="tab-panel active">
+  <button class="tab-button" data-target="tab-exec">Executive Review Dashboard</button>
   <div class="container">
     <section class="smartsheet-panel glass">
     <div class="smartsheet-header">
       <div>
         <p class="section-label">Smartsheet Live Data</p>
-        <p class="smartsheet-desc">Enter the Customer Success Master sheet ID or full Smartsheet sheet URL, plus your API token. The page fetches data directly from Smartsheet in the browser.</p>
+        <p class="smartsheet-desc">Enter the Customer Success Master sheet ID or full Smartsheet sheet URL, plus your API token if you want to use browser-supplied credentials. This dashboard is designed to use a backend proxy for Smartsheet access when deployed.</p>
         <p class="smartsheet-note">Need a token? In Smartsheet, go to your account menu → <strong>Personal settings</strong> → <strong>Apps &amp; Integrations</strong> → <strong>API Access</strong> and generate a new token. Then paste it here. Use the sheet ID from this URL: <strong>https://app.smartsheet.com/sheets/x5GV422g9p6xhrPjXgWgXHGxMqQwhqMRvRm6cGr1</strong>.</p>
       </div>
     </div>
     <div class="smartsheet-fields">
       <div class="smartsheet-field">
-        <label for="smartsheet-sheet-id">Sheet name or ID</label>
-        <input id="smartsheet-sheet-id" type="text" placeholder="Customer Success Master or sheet ID" value="Customer Success Master" />
+        <label for="smartsheet-sheet-id">Sheet ID or URL</label>
+        <input id="smartsheet-sheet-id" type="text" placeholder="Sheet ID or full Smartsheet URL" value="Customer Success Master" />
       </div>
       <div class="smartsheet-field">
         <label for="smartsheet-token">API Access Token (optional)</label>
@@ -472,6 +470,14 @@ body.login-active header, body.login-active main, body.login-active footer, body
   <div class="container">
     <div class="chart-card" style="min-height:780px;padding:0;overflow:hidden;">
       <iframe src="new-dashboard/index.html" title="Migration Drivers Dashboard" class="dashboard-iframe"></iframe>
+    </div>
+  </div>
+</div>
+
+<div id="tab-exec" class="tab-panel">
+  <div class="container">
+    <div class="chart-card" style="min-height:780px;padding:0;overflow:hidden;">
+      <iframe src="executive-risk-dashboard/index.html" title="Executive Risk Dashboard" class="dashboard-iframe" allowfullscreen></iframe>
     </div>
   </div>
 </div>
@@ -992,10 +998,6 @@ async function loadLiveSmartsheetData() {
     setSmartsheetStatus('Sheet URL or ID is required.', true);
     return;
   }
-  if (!token) {
-    setSmartsheetStatus('Smartsheet API token is required.', true);
-    return;
-  }
 
   setSmartsheetStatus('Loading live data from Smartsheet...', false);
   ssErrorText.style.opacity = '0';
@@ -1032,8 +1034,9 @@ tabButtons.forEach(button => {
   button.addEventListener('click', () => switchTab(button.dataset.target));
 });
 
-if (window.location.hash === '#tab-new') {
-  switchTab('tab-new');
+if (window.location.hash) {
+  const h = window.location.hash.replace('#','');
+  if (document.getElementById(h)) switchTab(h);
 }
 
 const loginScreen = document.getElementById('login-screen');

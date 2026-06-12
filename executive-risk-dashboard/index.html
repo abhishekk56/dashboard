@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Risk Migration — Executive Review</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+ --emerald:#34d399; --emerald-deep:#10b981; --mint:#a7f3d0;
+ --blue:#60a5fa; --green:#34d399; --yellow:#fbbf24; --red:#f87171; --black:#94a3b8;
+ --ink:#eafff7; --muted:#9fc6b5; --card:rgba(255,255,255,.07); --line:rgba(255,255,255,.16);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);
+ background:
+   radial-gradient(1200px 700px at 12% -8%,rgba(52,211,153,.20),transparent 55%),
+   radial-gradient(1000px 800px at 100% 0%,rgba(16,185,129,.14),transparent 50%),
+   linear-gradient(160deg,#04201a 0%,#062b22 38%,#0a3a2c 100%);
+ background-attachment:fixed; min-height:100vh; padding:42px clamp(16px,4vw,64px) 80px;}
+h1,h2,h3,.disp{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--emerald)}
+header.top{max-width:1320px;margin:0 auto 34px}
+header.top h1{font-size:clamp(28px,4vw,44px);font-weight:700;margin:8px 0 6px;line-height:1.05}
+header.top p{color:var(--muted);max-width:760px;font-size:15px;line-height:1.55}
+.wrap{max-width:1320px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;
+ backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+ box-shadow:0 18px 50px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.10);padding:26px 28px}
+.sec{margin-top:30px}
+.sec-h{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+.sec-h .n{font-family:'Space Grotesk';font-size:13px;color:var(--emerald);font-weight:700;
+ border:1px solid var(--line);border-radius:8px;padding:3px 9px}
+.sec-h h2{font-size:22px;font-weight:600}
+.sec-sub{color:var(--muted);font-size:14px;margin:2px 0 16px 0;max-width:920px;line-height:1.5}
+.grid{display:grid;gap:18px}
+.kpis{grid-template-columns:repeat(6,1fr)}
+.kpi .v{font-family:'Space Grotesk';font-size:30px;font-weight:700;line-height:1}
+.kpi .l{font-size:12px;color:var(--muted);margin-top:8px;letter-spacing:.02em}
+.kpi .d{font-size:11.5px;margin-top:6px;font-weight:600}
+.up{color:var(--emerald)} .down{color:var(--red)}
+.cols-2{grid-template-columns:1.15fr .85fr}
+.cols-3{grid-template-columns:repeat(3,1fr)}
+.interp{margin-top:14px;font-size:13.5px;line-height:1.55;color:#d8f3e7;
+ border-left:3px solid var(--emerald);padding:10px 0 10px 14px;background:linear-gradient(90deg,rgba(52,211,153,.10),transparent)}
+.interp b{color:#fff}
+table.mat{border-collapse:separate;border-spacing:5px;width:100%;font-size:13px}
+table.mat th{color:var(--muted);font-weight:600;font-size:11.5px;padding:4px}
+table.mat td{text-align:center;border-radius:9px;padding:11px 6px;font-weight:600;font-variant-numeric:tabular-nums}
+.rowlbl{color:var(--muted);font-weight:600;font-size:11.5px;text-align:right!important;padding-right:10px!important;background:none!important}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:6px}
+.bar-row{display:flex;align-items:center;gap:12px;margin:9px 0;font-size:13px}
+.bar-row .nm{width:190px;flex:none;color:#eafff7}
+.bar-row .track{flex:1;height:16px;background:rgba(255,255,255,.07);border-radius:8px;overflow:hidden}
+.bar-row .fill{height:100%;border-radius:8px}
+.bar-row .val{width:54px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.tag{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:6px;letter-spacing:.04em}
+.t-lead{background:rgba(52,211,153,.18);color:#6ee7b7} .t-lag{background:rgba(148,163,184,.18);color:#cbd5e1}
+.t-cons{background:rgba(251,191,36,.16);color:#fcd34d}
+.heat{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
+.heat .cell{border-radius:14px;padding:16px;text-align:center;border:1px solid var(--line)}
+.heat .cell .n{font-family:'Space Grotesk';font-size:26px;font-weight:700}
+.heat .cell .k{font-size:12px;margin-top:4px;opacity:.85}
+.recs{grid-template-columns:repeat(3,1fr)}
+.rec h3{font-size:15px;margin-bottom:4px}
+.rec .horizon{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--emerald);font-weight:700}
+.rec ul{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:12px}
+.rec li{font-size:13px;line-height:1.45}
+.rec li .a{font-weight:600;color:#fff;display:block;margin-bottom:3px}
+.rec li .m{color:var(--muted);font-size:11.5px}
+.pill{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;margin-right:5px}
+.p-hi{background:rgba(248,113,113,.18);color:#fca5a5}.p-md{background:rgba(251,191,36,.16);color:#fcd34d}
+.p-lo{background:rgba(52,211,153,.16);color:#6ee7b7}
+.note{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.5;border-top:1px solid var(--line);padding-top:14px}
+@media(max-width:1080px){.kpis{grid-template-columns:repeat(3,1fr)}.cols-2,.cols-3,.recs{grid-template-columns:1fr}.heat{grid-template-columns:repeat(2,1fr)}.bar-row .nm{width:120px}}
+canvas{max-height:280px}
+</style>
+</head>
+<body>
+<header class="top wrap">
+  <div class="eyebrow">Customer Success · Risk Intelligence</div>
+  <h1>Why Customers Migrate — and How to Move More Toward Blue & Green</h1>
+  <p>An end-to-end diagnostic of risk migration across the active customer base. The book is net-improving, but risk and revenue are concentrating in a small set of large, Mobile-platform accounts. This review isolates the true leading drivers from mechanical noise and converts them into a prioritized action plan.</p>
+</header>
+
+<div class="wrap">
+
+<!-- 1. KPI -->
+<section class="sec">
+  <div class="grid kpis">
+    <div class="card kpi"><div class="v">1,297</div><div class="l">Total customers (joined)</div><div class="d" style="color:var(--muted)">746 with prior + current status</div></div>
+    <div class="card kpi"><div class="v down">28</div><div class="l">Deteriorated</div><div class="d down">3.8% of migration base</div></div>
+    <div class="card kpi"><div class="v up">96</div><div class="l">Recovered</div><div class="d up">12.9% of migration base</div></div>
+    <div class="card kpi"><div class="v up">+68</div><div class="l">Net movement</div><div class="d up">Recoveries exceed declines 3.4×</div></div>
+    <div class="card kpi"><div class="v" style="color:var(--red)">12</div><div class="l">Critical accounts (Red)</div><div class="d down">10 moved directly into Red/Black</div></div>
+    <div class="card kpi"><div class="v">$26.5M</div><div class="l">ARR at elevated risk</div><div class="d" style="color:var(--muted)">20% of $133M book</div></div>
+  </div>
+  <div class="interp" style="max-width:none"><b>So what:</b> the portfolio is healthy in aggregate — for every account that slipped, 3.4 recovered. The management problem is not mass decline; it is <b>concentration</b>. One-fifth of ARR sits in elevated-risk accounts, and deterioration clusters in the highest-value tier. Leadership attention should be surgical, not broad.</div>
+</section>
+
+<!-- 2 & 3 -->
+<section class="sec grid cols-2">
+  <div class="card">
+    <div class="sec-h"><span class="n">02</span><h2>Current Risk Distribution</h2></div>
+    <div class="sec-sub">Where the 746-account migration base stands today.</div>
+    <canvas id="donut"></canvas>
+    <div class="legend" id="donutLeg"></div>
+    <div class="interp"><b>Read:</b> 84% sit in Green, the healthy core. The watch-list is the <b>49 Yellow + 12 Red</b> accounts — small in count but high in value, and the pool from which the next Black (lost) customers will come.</div>
+  </div>
+  <div class="card">
+    <div class="sec-h"><span class="n">03</span><h2>Risk Migration Matrix</h2></div>
+    <div class="sec-sub">Rows = previous status, columns = current. Diagonal = stable; below-diagonal = recovery; above = deterioration.</div>
+    <table class="mat" id="matrix"></table>
+    <div class="interp"><b>Read:</b> the dominant off-diagonal cell is <b>Yellow→Green (69)</b> — the recovery engine. Deterioration is thin and shallow: mostly <b>Green→Yellow (18)</b>, a one-notch slip that is highly reversible if caught early.</div>
+  </div>
+</section>
+
+<!-- 4 Sankey -->
+<section class="sec">
+  <div class="card">
+    <div class="sec-h"><span class="n">04</span><h2>Risk-Flow Sankey</h2></div>
+    <div class="sec-sub">Every status transition among the 124 accounts that moved. Green ribbons = recovery, red = deterioration; thickness = number of accounts.</div>
+    <div id="sankey"></div>
+    <div class="interp"><b>Read:</b> the flow is overwhelmingly upward (leftward, toward health). The system already <b>self-corrects from Yellow and Red</b>. The leak to guard is the slender red Green→Yellow / Green→Red stream — a small number of healthy, often large accounts quietly slipping.</div>
+  </div>
+</section>
+
+<!-- 5 & 6 drivers -->
+<section class="sec grid cols-2">
+  <div class="card">
+    <div class="sec-h"><span class="n">05</span><h2>Deterioration Drivers</h2></div>
+    <div class="sec-sub">Genuine <i>leading</i> indicators of elevated risk, separated from mechanical artefacts. Bars = strength of association (effect size / model odds).</div>
+    <div id="detDrivers"></div>
+    <div class="interp"><b>Why:</b> the pattern is operational, not commercial. Risk is manufactured by <b>service failure</b> — SLA misses, escalations and ticket load — amplified by <b>Mobile-platform complexity</b> and <b>account size</b>. Customers don't leave because of price; they leave because delivery hurts.</div>
+  </div>
+  <div class="card">
+    <div class="sec-h"><span class="n">06</span><h2>Recovery Drivers</h2></div>
+    <div class="sec-sub">What separates accounts that climbed back to Green from those that stayed elevated.</div>
+    <div id="recDrivers"></div>
+    <div class="interp"><b>Why:</b> recovery is <b>relationship-led</b>. The cleanest differentiator is <b>Business Reviews completed</b> (recovered accounts had ≥1 QBR in 12 months; stuck accounts had none). Falling escalation volume and restored sentiment follow. Cadence and presence drive the turnaround.</div>
+  </div>
+</section>
+
+<!-- 7 segment -->
+<section class="sec">
+  <div class="card">
+    <div class="sec-h"><span class="n">07</span><h2>Segment Risk Analysis</h2></div>
+    <div class="sec-sub">Elevated-risk rate (bars) against ARR exposure (line) by segment, platform and account value.</div>
+    <div class="grid cols-2" style="margin-top:6px">
+      <div><canvas id="segChart"></canvas></div>
+      <div><canvas id="platChart"></canvas></div>
+    </div>
+    <div class="interp"><b>Read:</b> risk rises monotonically with value — <b>Key Customers run 23% elevated and accounts >$200K run 18%</b>, while sub-$25K accounts are ~1%. <b>Mobile is the structural hotspot</b>: 16% elevated and $79M ARR, versus 2% for Fixed. The exposure equation is unambiguous: <b>big + Mobile = the risk frontier</b>, and that is exactly where retention spend earns its highest return.</div>
+  </div>
+</section>
+
+<!-- 8 predictive -->
+<section class="sec grid cols-2">
+  <div class="card">
+    <div class="sec-h"><span class="n">08</span><h2>Predictive Risk Heatmap</h2></div>
+    <div class="sec-sub">Every customer scored by an early-warning model built on leading indicators only. Cross-validated AUC = 0.78.</div>
+    <div class="heat" id="bands"></div>
+    <div class="interp"><b>Read:</b> <b>216 accounts</b> score High or Critical. The model discriminates well enough to triage a 1,297-account book down to a focused intervention list — without waiting for the risk status to officially flip.</div>
+  </div>
+  <div class="card">
+    <div class="sec-h"><span class="n">09</span><h2>Early-Warning Indicators</h2></div>
+    <div class="sec-sub">The signals that fire <i>before</i> status changes — the CS team's daily watch-list.</div>
+    <div id="ews"></div>
+    <div class="interp"><b>Trigger thresholds:</b> any open escalation, SLA-miss volume above peer median, Mobile multi-platform footprint, falling sentiment, or <b>any past-due balance</b> (present in 31% of elevated vs 16% of healthy accounts).</div>
+  </div>
+</section>
+
+<!-- 10 recovery opportunity -->
+<section class="sec">
+  <div class="card">
+    <div class="sec-h"><span class="n">10</span><h2>Customer Recovery Opportunities</h2></div>
+    <div class="sec-sub">Where the next wins are — highest expected return per unit of CS effort.</div>
+    <div class="grid cols-3">
+      <div class="card" style="background:rgba(52,211,153,.10)"><div class="kpi"><div class="v up">154</div><div class="l">Hidden-risk accounts</div></div><p style="font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5">Currently Blue/Green but scoring High/Critical. Intervene now to prevent the first slip — the cheapest save there is.</p></div>
+      <div class="card" style="background:rgba(96,165,250,.08)"><div class="kpi"><div class="v" style="color:var(--blue)">49</div><div class="l">Yellow accounts</div></div><p style="font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5">The proven recovery lane — Yellow→Green is the most travelled path in the data. A QBR + escalation clean-up flips most of these.</p></div>
+      <div class="card" style="background:rgba(251,191,36,.08)"><div class="kpi"><div class="v" style="color:var(--yellow)">$38.7M</div><div class="l">"Large Renewal" cohort ARR</div></div><p style="font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5">24% elevated and renewal-exposed. Highest dollar-impact cohort — protect contractually and operationally before the renewal window.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 recommendations -->
+<section class="sec">
+  <div class="sec-h"><span class="n">11</span><h2>Strategic Recommendations</h2></div>
+  <div class="sec-sub">Sequenced by horizon. Each carries expected impact, effort and priority.</div>
+  <div class="grid recs">
+    <div class="card rec">
+      <div class="horizon">0–30 Days · Quick Wins</div>
+      <ul>
+        <li><span class="a">Stand up the 154-account "hidden risk" save list</span><span class="m"><span class="pill p-hi">High priority</span>Impact: high · Effort: low. Proactive outreach before the first downgrade.</span></li>
+        <li><span class="a">SLA-miss war-room for Mobile accounts</span><span class="m"><span class="pill p-hi">High priority</span>Impact: high · Effort: medium. Attack the #1 manufactured driver at its source.</span></li>
+        <li><span class="a">Clear every open escalation on a Red/Yellow account</span><span class="m"><span class="pill p-md">Medium</span>Impact: medium · Effort: low. Escalations are the strongest reversible signal.</span></li>
+      </ul>
+    </div>
+    <div class="card rec">
+      <div class="horizon">30–90 Days · Process</div>
+      <ul>
+        <li><span class="a">Mandate a QBR cadence for all >$200K & Key accounts</span><span class="m"><span class="pill p-hi">High priority</span>Impact: high · Effort: medium. QBRs are the clearest recovery lever in the data.</span></li>
+        <li><span class="a">Wire the early-warning score into the CRM</span><span class="m"><span class="pill p-md">Medium</span>Impact: high · Effort: medium. Turn a 0.78-AUC model into a daily workflow.</span></li>
+        <li><span class="a">Join AR data to CS — past-due triggers a health review</span><span class="m"><span class="pill p-md">Medium</span>Impact: medium · Effort: low. Financial distress doubles risk; treat it as a CS signal.</span></li>
+      </ul>
+    </div>
+    <div class="card rec">
+      <div class="horizon">90+ Days · Structural</div>
+      <ul>
+        <li><span class="a">Mobile platform reliability program</span><span class="m"><span class="pill p-hi">High priority</span>Impact: very high · Effort: high. The platform carries $79M ARR and the highest risk rate — fixing delivery here resets the whole curve.</span></li>
+        <li><span class="a">Segment-tiered service model</span><span class="m"><span class="pill p-md">Medium</span>Impact: high · Effort: high. Match CS intensity to value, since risk scales with ARR.</span></li>
+        <li><span class="a">Renewal-risk playbook for the Large Renewal cohort</span><span class="m"><span class="pill p-lo">Plan</span>Impact: high · Effort: medium. De-risk the $38.7M cohort 6+ months out.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="note wrap">
+  <b>Method & confidence.</b> Analysis covers 746 accounts with both a prior and current risk status. Cohorts: Stable 622 (83.4%), Recovery 96 (12.9%), Deterioration 28 (3.8%). Driver strength uses rank-biserial effect sizes and a cross-validated random-forest early-warning model (AUC 0.78). Mechanical fields tied to the outcome by construction (days-since-change, prioritization score, time-in-prior-state) were excluded from "drivers." Findings are <i>associative</i>, not causal, and the deterioration sample is small — treat the deterioration ranking as directional and confirm levers via controlled rollout. Data as of June 2026.
+</div>
+</div>
+
+<script>
+const RC={blue:'#60a5fa',green:'#34d399',yellow:'#fbbf24',red:'#f87171',black:'#94a3b8'};
+Chart.defaults.color='#9fc6b5';Chart.defaults.font.family="Inter";Chart.defaults.borderColor='rgba(255,255,255,.08)';
+
+const cd={Blue:57,Green:628,Yellow:49,Red:12,Black:0};
+new Chart(document.getElementById('donut'),{type:'doughnut',data:{labels:Object.keys(cd),datasets:[{data:Object.values(cd),backgroundColor:[RC.blue,RC.green,RC.yellow,RC.red,RC.black],borderWidth:0}]},options:{cutout:'62%',plugins:{legend:{display:false}}}});
+document.getElementById('donutLeg').innerHTML=Object.entries(cd).map(([k,v])=>`<span><span class="dot" style="background:${RC[k.toLowerCase()]}"></span>${k} · ${v}</span>`).join('');
+
+const order=['Blue','Green','Yellow','Red','Black'];
+const M={Blue:{Blue:54,Green:0,Yellow:0,Red:0,Black:0},
+ Green:{Blue:3,Green:551,Yellow:18,Red:4,Black:0},
+ Yellow:{Blue:0,Green:69,Yellow:15,Red:6,Black:0},
+ Red:{Blue:0,Green:16,Yellow:16,Red:2,Black:0},
+ Black:{Blue:0,Green:3,Yellow:0,Red:0,Black:0}};
+let html='<tr><th></th>'+order.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+order.forEach((p,ri)=>{html+=`<tr><td class="rowlbl">${p}</td>`;
+ order.forEach((c,ci)=>{const v=M[p][c];let bg='rgba(255,255,255,.04)',col='#9fc6b5';
+   if(v>0){if(ci===ri){bg='rgba(52,211,153,.10)';col='#cfeede';}
+     else if(ci<ri){const a=Math.min(.18+v/90,.85);bg=`rgba(52,211,153,${a})`;col='#04201a';}
+     else{const a=Math.min(.22+v/40,.85);bg=`rgba(248,113,113,${a})`;col='#2a0b0b';}}
+   html+=`<td style="background:${bg};color:${col}">${v||''}</td>`;});
+ html+='</tr>';});
+document.getElementById('matrix').innerHTML=html;
+
+(function(){const W=1180,H=300,pad=40,colX={prev:pad,cur:W-pad-150};
+ const lvl={Blue:0,Green:1,Yellow:2,Red:3,Black:4},yOf=l=>50+l*52;
+ let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg">`;
+ const flows=[['Yellow','Green',69],['Green','Yellow',18],['Red','Yellow',16],['Yellow','Red',6],['Red','Green',5],['Green','Red',4],['Green','Blue',3],['Black','Green',3]];
+ flows.forEach(([p,c,v])=>{const y1=yOf(lvl[p]),y2=yOf(lvl[c]),x1=colX.prev+150,x2=colX.cur;
+   const det=lvl[c]>lvl[p];const col=det?'rgba(248,113,113,':'rgba(52,211,153,';
+   const w=Math.max(2,v*0.9);
+   s+=`<path d="M${x1},${y1} C${(x1+x2)/2},${y1} ${(x1+x2)/2},${y2} ${x2},${y2}" stroke="${col}.45)" stroke-width="${w}" fill="none"/>`;});
+ ['prev','cur'].forEach(side=>{order.forEach(n=>{const y=yOf(lvl[n]),x=colX[side];
+   s+=`<rect x="${x}" y="${y-13}" width="150" height="26" rx="7" fill="${RC[n.toLowerCase()]}" opacity=".92"/>`;
+   s+=`<text x="${x+75}" y="${y+5}" text-anchor="middle" font-size="13" font-family="Inter" font-weight="600" fill="#04201a">${n}</text>`;});});
+ s+=`<text x="${colX.prev+75}" y="22" text-anchor="middle" font-size="11" fill="#9fc6b5" font-family="Inter" letter-spacing="2">PREVIOUS</text>`;
+ s+=`<text x="${colX.cur+75}" y="22" text-anchor="middle" font-size="11" fill="#9fc6b5" font-family="Inter" letter-spacing="2">CURRENT</text>`;
+ s+='</svg>';document.getElementById('sankey').innerHTML=s;})();
+
+function bars(el,rows){document.getElementById(el).innerHTML=rows.map(r=>{
+ const pct=Math.round(r.s*100);const col=r.dir==='up'?'linear-gradient(90deg,#f87171,#fb923c)':'linear-gradient(90deg,#34d399,#10b981)';
+ const tag=r.t==='lead'?'<span class="tag t-lead">LEADING</span>':r.t==='cons'?'<span class="tag t-cons">CONSEQUENCE</span>':'<span class="tag t-lag">CONTEXT</span>';
+ return `<div class="bar-row"><div class="nm">${r.n} ${tag}</div><div class="track"><div class="fill" style="width:${pct}%;background:${col}"></div></div><div class="val">${r.v}</div></div>`;}).join('');}
+bars('detDrivers',[
+ {n:'SLA misses (volume)',s:.47,v:'.47',dir:'up',t:'lead'},
+ {n:'Open escalations',s:.46,v:'1.6×',dir:'up',t:'lead'},
+ {n:'Low CSAT / value rating',s:.46,v:'.46',dir:'up',t:'lead'},
+ {n:'Ticket load (RITM/Case)',s:.40,v:'.40',dir:'up',t:'lead'},
+ {n:'Mobile platform',s:.82,v:'1.8×',dir:'up',t:'lead'},
+ {n:'Account size (ARR)',s:.50,v:'.50',dir:'up',t:'lead'},
+ {n:'Past-due / late fees',s:.33,v:'2× frequency',dir:'up',t:'lead'},
+ {n:'Low service margin',s:.25,v:'.25',dir:'up',t:'lead'},
+]);
+bars('recDrivers',[
+ {n:'Business Reviews completed',s:.55,v:'≥1 QBR',dir:'down',t:'lead'},
+ {n:'Falling escalation count',s:.63,v:'.63',dir:'down',t:'lead'},
+ {n:'Restored CSAT',s:.43,v:'.43',dir:'down',t:'lead'},
+ {n:'Improving sentiment',s:.36,v:'.36',dir:'down',t:'lead'},
+ {n:'Time held in prior state',s:.50,v:'context',dir:'down',t:'lag'},
+]);
+
+const seg={labels:['Key Cust','Europe','Mid Ent','Enterprise','Commercial','Partner'], elev:[23,17,12,10,5,2],arr:[47.8,1.3,10.4,59.8,2.6,11.2]};
+function mixed(ctx,d){return new Chart(ctx,{data:{labels:d.labels,datasets:[
+ {type:'bar',label:'Elevated-risk %',data:d.elev,backgroundColor:'rgba(248,113,113,.65)',borderRadius:6,yAxisID:'y'},
+ {type:'line',label:'ARR ($M)',data:d.arr,borderColor:'#34d399',backgroundColor:'#34d399',tension:.35,yAxisID:'y1',pointRadius:3}]},options:{plugins:{legend:{labels:{boxWidth:12,font:{size:11}}}},scales:{y:{position:'left',grid:{color:'rgba(255,255,255,.06)'},title:{display:true,text:'% elevated'}},y1:{position:'right',grid:{display:false},title:{display:true,text:'ARR $M'}}}}});}
+mixed(document.getElementById('segChart'),seg);
+mixed(document.getElementById('platChart'),{labels:['Mobile','Non-Core','Rivermine','Fixed'],elev:[16,7,4,2],arr:[78.8,9.7,18.7,14.5]});
+
+const bands=[['Low',544,'rgba(52,211,153,.20)','#6ee7b7'],['Medium',537,'rgba(251,191,36,.16)','#fcd34d'],['High',161,'rgba(251,146,60,.20)','#fdba74'],['Critical',55,'rgba(248,113,113,.22)','#fca5a5']];
+document.getElementById('bands').innerHTML=bands.map(([k,v,bg,c])=>`<div class="cell" style="background:${bg}"><div class="n" style="color:${c}">${v}</div><div class="k">${k} risk</div></div>`).join('');
+
+const ews=[['Mobile multi-platform','1.8× odds','lead'],['Open escalation present','1.6× odds','lead'],['SLA misses > peer median','strong','lead'],['Any past-due balance','2× frequency','lead'],['Falling sentiment score','protective when high','lead'],['Rising ticket / case load','moderate','lead'],['Account value > $200K','exposure','lag']];
+document.getElementById('ews').innerHTML=ews.map(([n,v,t])=>{const tag=t==='lead'?'<span class="tag t-lead">LEADING</span>':'<span class="tag t-lag">EXPOSURE</span>';return `<div class="bar-row"><div class="nm" style="width:auto;flex:1">${n} ${tag}</div><div class="val" style="width:auto;color:#cfeede;font-weight:600">${v}</div></div>`;}).join('');
+</script>
+</body>
+</html>
